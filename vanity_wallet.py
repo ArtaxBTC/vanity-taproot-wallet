@@ -25,8 +25,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 #  CONFIG
 # ---------------------------------------------------------------------------
-TARGET_PREFIX = "dead"          # after "bc1p" -> address starts with bc1pdead...  ("" = disabled)
-TARGET_SUFFIX = ""             # end of address  -> address ends with ...xyz       ("" = disabled)
+TARGET_PREFIX = ["unk", "artaxwasthere"]   # list of prefixes (bc1p[prefix]...); [] = disabled
+TARGET_SUFFIX = []                   # list of suffixes (bc1p...[suffix]); [] = disabled
 WALLET_INDEX  = 0              # BIP86 m/86'/0'/0'/0/{index} -- 0 = first wallet
 PASSPHRASE    = ""             # BIP39 passphrase (leave empty = none)
 WORDS_COUNT   = 12             # 12 or 24 words (12 = 128 bits, sufficient)
@@ -95,16 +95,20 @@ def _save_checkpoint(total_attempts, sessions, found=False):
 
 def _target_label():
     """Return a human-readable description of the current target."""
-    if TARGET_PREFIX and TARGET_SUFFIX:
-        return f"bc1p[{TARGET_PREFIX}]...[{TARGET_SUFFIX}]"
-    if TARGET_PREFIX:
-        return f"bc1p[{TARGET_PREFIX}]..."
-    return f"bc1p...[{TARGET_SUFFIX}]"
+    pfxs = [p for p in TARGET_PREFIX if p]
+    sfxs = [s for s in TARGET_SUFFIX if s]
+    p_str = "|".join(pfxs) if pfxs else ""
+    s_str = "|".join(sfxs) if sfxs else ""
+    if p_str and s_str:
+        return f"bc1p[{p_str}]...[{s_str}]"
+    if p_str:
+        return f"bc1p[{p_str}]..."
+    return f"bc1p...[{s_str}]"
 
 
-def _worker(target_prefix, target_suffix, passphrase, wallet_index, words_count,
+def _worker(target_prefixes, target_suffixes, passphrase, wallet_index, words_count,
             stop_event, result_queue, counter):
-    """Worker: generates random mnemonics and checks the bc1p prefix/suffix."""
+    """Worker: generates random mnemonics and checks bc1p against all prefix/suffix patterns."""
     from bip_utils import (
         Bip39MnemonicGenerator, Bip39WordsNum,
         Bip39SeedGenerator, Bip86, Bip86Coins, Bip44Changes,
@@ -141,10 +145,12 @@ def _worker(target_prefix, target_suffix, passphrase, wallet_index, words_count,
                 counter.value += 50
 
         match = (
-            (not target_prefix or bc1p.startswith("bc1p" + target_prefix)) and
-            (not target_suffix or bc1p.endswith(target_suffix))
+            (not target_prefixes or any(bc1p.startswith("bc1p" + p) for p in target_prefixes)) and
+            (not target_suffixes or any(bc1p.endswith(s) for s in target_suffixes))
         )
         if match:
+            matched_prefix = next((p for p in target_prefixes if bc1p.startswith("bc1p" + p)), "")
+            matched_suffix = next((s for s in target_suffixes if bc1p.endswith(s)), "")
             # Also derive bc1q for reference
             bc1q = (
                 Bip84.FromSeed(seed, Bip84Coins.BITCOIN)
@@ -155,9 +161,11 @@ def _worker(target_prefix, target_suffix, passphrase, wallet_index, words_count,
             )
             stop_event.set()
             result_queue.put({
-                "mnemonic": mnemonic_str,
-                "bc1p":     bc1p,
-                "bc1q":     bc1q,
+                "mnemonic":       mnemonic_str,
+                "bc1p":           bc1p,
+                "bc1q":           bc1q,
+                "matched_prefix": matched_prefix,
+                "matched_suffix": matched_suffix,
             })
             return
 
@@ -190,19 +198,23 @@ def _benchmark(passphrase, wallet_index, words_count, n=30):
 
 def main():
     # --- Validation ---
-    if not TARGET_PREFIX and not TARGET_SUFFIX:
+    prefixes = [p for p in TARGET_PREFIX if p]
+    suffixes = [s for s in TARGET_SUFFIX if s]
+    if not prefixes and not suffixes:
         sys.exit("[ERROR] Both TARGET_PREFIX and TARGET_SUFFIX are empty.")
-    invalid = [c for c in (TARGET_PREFIX + TARGET_SUFFIX) if c not in BECH32M_CHARSET]
+    invalid = [c for c in "".join(prefixes + suffixes) if c not in BECH32M_CHARSET]
     if invalid:
         sys.exit(
-            f"[ERROR] Invalid bech32m characters: {''.join(invalid)}\n"
+            f"[ERROR] Invalid bech32m characters: {''.join(sorted(set(invalid)))}\n"
             f"Allowed characters: {''.join(sorted(BECH32M_CHARSET))}\n"
             f"Excluded (visual confusion): b i o 1 and uppercase"
         )
 
-    n_workers = WORKERS or os.cpu_count()
-    n_chars   = len(TARGET_PREFIX) + len(TARGET_SUFFIX)
-    expected  = 32 ** n_chars
+    n_workers  = WORKERS or os.cpu_count()
+    n_patterns = len(prefixes) + len(suffixes)
+    p_prefix   = sum(1 / 32**len(p) for p in prefixes) if prefixes else 1.0
+    p_suffix   = sum(1 / 32**len(s) for s in suffixes) if suffixes else 1.0
+    expected   = int(1 / (p_prefix * p_suffix))
 
     # --- Load checkpoint ---
     prev_attempts, prev_sessions = _load_checkpoint()
@@ -211,7 +223,8 @@ def main():
     print(f"  vanity_wallet.py -- Bitcoin bc1p vanity address generator")
     print(f"{'='*65}")
     print(f"\n  Target          : {_target_label()}")
-    print(f"  Expected tries  : {expected:,}  (32^{n_chars})")
+    print(f"  Patterns        : {n_patterns}  ({len(prefixes)} prefix, {len(suffixes)} suffix)")
+    print(f"  Expected tries  : {expected:,}")
     print(f"  Workers         : {n_workers} cores")
     print(f"  Mnemonic        : {WORDS_COUNT} words")
     if prev_attempts > 0:
@@ -244,7 +257,7 @@ def main():
     procs = [
         multiprocessing.Process(
             target=_worker,
-            args=(TARGET_PREFIX, TARGET_SUFFIX, PASSPHRASE, WALLET_INDEX, WORDS_COUNT,
+            args=(prefixes, suffixes, PASSPHRASE, WALLET_INDEX, WORDS_COUNT,
                   stop_event, result_queue, counter),
             daemon=True,
         )
@@ -309,6 +322,11 @@ def main():
     print(f"{'='*65}")
     print(f"\n  bc1p (ordinals)  : {result['bc1p']}")
     print(f"  bc1q (payments)  : {result['bc1q']}")
+    if n_patterns > 1:
+        mp  = result.get('matched_prefix', '')
+        ms  = result.get('matched_suffix', '')
+        lbl = ("bc1p[" + mp + "]" if mp else "bc1p") + "..." + ("[" + ms + "]" if ms else "")
+        print(f"  Matched pattern  : {lbl}")
     print(f"\n  Mnemonic ({WORDS_COUNT} words):")
     words = result['mnemonic'].split()
     for i, w in enumerate(words, 1):
@@ -322,10 +340,12 @@ def main():
 
     # --- Temporary result save ---
     out = {
-        "bc1p":         result["bc1p"],
-        "bc1q":         result["bc1q"],
-        "mnemonic":     result["mnemonic"],
-        "wallet_index": WALLET_INDEX,
+        "bc1p":           result["bc1p"],
+        "bc1q":           result["bc1q"],
+        "mnemonic":       result["mnemonic"],
+        "matched_prefix": result.get("matched_prefix", ""),
+        "matched_suffix": result.get("matched_suffix", ""),
+        "wallet_index":   WALLET_INDEX,
         "words":        WORDS_COUNT,
         "attempts":     total,
         "elapsed_s":    round(elapsed, 1),

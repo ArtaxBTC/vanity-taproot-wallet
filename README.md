@@ -6,6 +6,16 @@ Generate a Bitcoin Taproot (P2TR: `bc1p...`) vanity address for **Ordinals**, on
   <img src="vanity_wallet.webp" alt="vanity_wallet" />
 </p>
 
+## Changelog
+
+**v0.2**
+- Added multi-pattern search support
+- Allows multiple prefix and/or suffix patterns
+- Stops on first successful match
+- Supports patterns of varying lengths
+
+---
+
 ## ⚠️ Disclaimer & Security Recommendations
 
 **Use this script at your own risk.** It handles sensitive cryptographic material (private keys derived from a mnemonic). The author takes no responsibility for lost funds, stolen keys, or any misuse.
@@ -86,11 +96,11 @@ pip install bip_utils
 Open `vanity_wallet.py` and edit the `CONFIG` section at the top:
 
 ```python
-TARGET_PREFIX = "dead"   # address will start with bc1pdead...  ("" = disabled)
-TARGET_SUFFIX = ""      # address will end   with ...xyz      ("" = disabled)
+TARGET_PREFIX = ["dead", "cafe"]   # list of prefixes (bc1p[prefix]...); [] = disabled
+TARGET_SUFFIX = []                  # list of suffixes (bc1p...[suffix]); [] = disabled
 ```
 
-Set one or both. At least one must be non-empty.
+Set at least one non-empty list. The script stops as soon as **any** pattern is matched -- searching for multiple patterns runs in parallel at no extra cost and reduces expected time proportionally. For example, 3 prefixes of the same length find a result ~3x faster on average than a single prefix.
 
 ### 2. Run the script
 
