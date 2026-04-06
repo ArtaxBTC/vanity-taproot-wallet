@@ -19,6 +19,7 @@ import os
 import sys
 import time
 import json
+import signal
 import multiprocessing
 from pathlib import Path
 
@@ -109,6 +110,7 @@ def _target_label():
 def _worker(target_prefixes, target_suffixes, passphrase, wallet_index, words_count,
             stop_event, result_queue, counter):
     """Worker: generates random mnemonics and checks bc1p against all prefix/suffix patterns."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)  # workers ignore Ctrl+C
     from bip_utils import (
         Bip39MnemonicGenerator, Bip39WordsNum,
         Bip39SeedGenerator, Bip86, Bip86Coins, Bip44Changes,
@@ -299,8 +301,6 @@ def main():
         print(f"  Checkpoint saved: {Path(CHECKPOINT_FILE).resolve()}")
         print(f"  Re-run the script to resume.")
         stop_event.set()
-        for p in procs:
-            p.terminate()
         sys.exit(0)
 
     for p in procs:
