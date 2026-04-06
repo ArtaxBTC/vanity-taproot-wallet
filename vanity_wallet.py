@@ -25,7 +25,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 #  CONFIG
 # ---------------------------------------------------------------------------
-TARGET_PREFIX = ["unk", "artaxwasthere"]   # list of prefixes (bc1p[prefix]...); [] = disabled
+TARGET_PREFIX = ["dead", "cafe"]   # list of prefixes (bc1p[prefix]...); [] = disabled
 TARGET_SUFFIX = []                   # list of suffixes (bc1p...[suffix]); [] = disabled
 WALLET_INDEX  = 0              # BIP86 m/86'/0'/0'/0/{index} -- 0 = first wallet
 PASSPHRASE    = ""             # BIP39 passphrase (leave empty = none)
