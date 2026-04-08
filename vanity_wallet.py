@@ -6,7 +6,7 @@ with a chosen string. Uses all CPU cores via multiprocessing
 (PBKDF2-HMAC-SHA512 is not GPU-friendly).
 
 Workflow:
-  1. Set TARGET_PREFIX and/or TARGET_SUFFIX below
+  1. Set TARGET_NOPREF, TARGET_PREFIX and/or TARGET_SUFFIX below
   2. python vanity_wallet.py
   3. Write down the displayed mnemonic
   4. Shred vanity_wallet_result.json (before opening any wallet app)
@@ -28,6 +28,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 TARGET_PREFIX = ["dead", "cafe"]   # list of prefixes (bc1p[prefix]...); [] = disabled
 TARGET_SUFFIX = []                   # list of suffixes (bc1p...[suffix]); [] = disabled
+TARGET_NOPREF = []                   # list of patterns to match at start OR end (first found wins); [] = disabled
 WALLET_INDEX  = 0              # BIP86 m/86'/0'/0'/0/{index} -- 0 = first wallet
 PASSPHRASE    = ""             # BIP39 passphrase (leave empty = none)
 WORDS_COUNT   = 12             # 12 or 24 words (12 = 128 bits, sufficient)
@@ -54,9 +55,11 @@ def _load_checkpoint():
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        if data.get("target_prefix") != TARGET_PREFIX or data.get("target_suffix") != TARGET_SUFFIX:
+        if (data.get("target_prefix") != TARGET_PREFIX or
+                data.get("target_suffix") != TARGET_SUFFIX or
+                data.get("target_nopref") != TARGET_NOPREF):
             print(f"  [CHECKPOINT] Different target in checkpoint -- ignored."
-                  f" (prefix={data.get('target_prefix')!r} suffix={data.get('target_suffix')!r})")
+                  f" (prefix={data.get('target_prefix')!r} suffix={data.get('target_suffix')!r} nopref={data.get('target_nopref')!r})")
             return 0, 0
         if data.get("found"):
             label = _target_label()
@@ -78,6 +81,7 @@ def _save_checkpoint(total_attempts, sessions, found=False):
     data = {
         "target_prefix":  TARGET_PREFIX,
         "target_suffix":  TARGET_SUFFIX,
+        "target_nopref":  TARGET_NOPREF,
         "total_attempts": total_attempts,
         "sessions":       sessions,
         "last_saved":     time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -98,16 +102,18 @@ def _target_label():
     """Return a human-readable description of the current target."""
     pfxs = [p for p in TARGET_PREFIX if p]
     sfxs = [s for s in TARGET_SUFFIX if s]
-    p_str = "|".join(pfxs) if pfxs else ""
-    s_str = "|".join(sfxs) if sfxs else ""
-    if p_str and s_str:
-        return f"bc1p[{p_str}]...[{s_str}]"
-    if p_str:
-        return f"bc1p[{p_str}]..."
-    return f"bc1p...[{s_str}]"
+    npfs = [p for p in TARGET_NOPREF if p]
+    parts = []
+    if pfxs:
+        parts.append("bc1p[" + "|".join(pfxs) + "]...")
+    if sfxs:
+        parts.append("bc1p...[" + "|".join(sfxs) + "]")
+    if npfs:
+        parts.append("[" + "|".join(npfs) + "](either end)")
+    return "  |  ".join(parts) if parts else "(none)"
 
 
-def _worker(target_prefixes, target_suffixes, passphrase, wallet_index, words_count,
+def _worker(target_prefixes, target_suffixes, target_nopref, passphrase, wallet_index, words_count,
             stop_event, result_queue, counter):
     """Worker: generates random mnemonics and checks bc1p against all prefix/suffix patterns."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)  # workers ignore Ctrl+C
@@ -146,13 +152,25 @@ def _worker(target_prefixes, target_suffixes, passphrase, wallet_index, words_co
             with counter.get_lock():
                 counter.value += 50
 
-        match = (
-            (not target_prefixes or any(bc1p.startswith("bc1p" + p) for p in target_prefixes)) and
-            (not target_suffixes or any(bc1p.endswith(s) for s in target_suffixes))
+        # Fixed prefix/suffix (AND logic: both must match if both defined)
+        prefix_ok = (not target_prefixes) or any(bc1p.startswith("bc1p" + p) for p in target_prefixes)
+        suffix_ok = (not target_suffixes) or any(bc1p.endswith(s) for s in target_suffixes)
+        combined_match = bool(target_prefixes or target_suffixes) and prefix_ok and suffix_ok
+        # No-preference patterns (OR logic: match at start OR end)
+        nopref_match = bool(target_nopref) and any(
+            bc1p.startswith("bc1p" + w) or bc1p.endswith(w) for w in target_nopref
         )
+        match = combined_match or nopref_match
         if match:
             matched_prefix = next((p for p in target_prefixes if bc1p.startswith("bc1p" + p)), "")
             matched_suffix = next((s for s in target_suffixes if bc1p.endswith(s)), "")
+            if not matched_prefix and not matched_suffix:
+                # matched via TARGET_NOPREF -- find which word and which end
+                w = next((w for w in target_nopref if bc1p.startswith("bc1p" + w) or bc1p.endswith(w)), "")
+                if bc1p.startswith("bc1p" + w):
+                    matched_prefix = w
+                else:
+                    matched_suffix = w
             # Also derive bc1q for reference
             bc1q = (
                 Bip84.FromSeed(seed, Bip84Coins.BITCOIN)
@@ -202,9 +220,10 @@ def main():
     # --- Validation ---
     prefixes = [p for p in TARGET_PREFIX if p]
     suffixes = [s for s in TARGET_SUFFIX if s]
-    if not prefixes and not suffixes:
-        sys.exit("[ERROR] Both TARGET_PREFIX and TARGET_SUFFIX are empty.")
-    invalid = [c for c in "".join(prefixes + suffixes) if c not in BECH32M_CHARSET]
+    nopref   = [w for w in TARGET_NOPREF if w]
+    if not prefixes and not suffixes and not nopref:
+        sys.exit("[ERROR] All TARGET_PREFIX, TARGET_SUFFIX and TARGET_NOPREF are empty.")
+    invalid = [c for c in "".join(prefixes + suffixes + nopref) if c not in BECH32M_CHARSET]
     if invalid:
         sys.exit(
             f"[ERROR] Invalid bech32m characters: {''.join(sorted(set(invalid)))}\n"
@@ -213,10 +232,15 @@ def main():
         )
 
     n_workers  = WORKERS or os.cpu_count()
-    n_patterns = len(prefixes) + len(suffixes)
-    p_prefix   = sum(1 / 32**len(p) for p in prefixes) if prefixes else 1.0
-    p_suffix   = sum(1 / 32**len(s) for s in suffixes) if suffixes else 1.0
-    expected   = int(1 / (p_prefix * p_suffix))
+    n_patterns = len(prefixes) + len(suffixes) + len(nopref)
+    if prefixes or suffixes:
+        p_combined = (sum(1.0 / 32**len(p) for p in prefixes) if prefixes else 1.0) * \
+                     (sum(1.0 / 32**len(s) for s in suffixes) if suffixes else 1.0)
+    else:
+        p_combined = 0.0
+    p_nopref = sum(2.0 / 32**len(w) for w in nopref)
+    p_total  = p_combined + p_nopref
+    expected = int(1 / p_total) if p_total > 0 else 10**18
 
     # --- Load checkpoint ---
     prev_attempts, prev_sessions = _load_checkpoint()
@@ -225,7 +249,7 @@ def main():
     print(f"  vanity_wallet.py -- Bitcoin bc1p vanity address generator")
     print(f"{'='*65}")
     print(f"\n  Target          : {_target_label()}")
-    print(f"  Patterns        : {n_patterns}  ({len(prefixes)} prefix, {len(suffixes)} suffix)")
+    print(f"  Patterns        : {n_patterns}  ({len(prefixes)} prefix, {len(suffixes)} suffix, {len(nopref)} either)")
     print(f"  Expected tries  : {expected:,}")
     print(f"  Workers         : {n_workers} cores")
     print(f"  Mnemonic        : {WORDS_COUNT} words")
@@ -259,7 +283,7 @@ def main():
     procs = [
         multiprocessing.Process(
             target=_worker,
-            args=(prefixes, suffixes, PASSPHRASE, WALLET_INDEX, WORDS_COUNT,
+            args=(prefixes, suffixes, nopref, PASSPHRASE, WALLET_INDEX, WORDS_COUNT,
                   stop_event, result_queue, counter),
             daemon=True,
         )

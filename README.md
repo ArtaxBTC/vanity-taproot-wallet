@@ -8,6 +8,11 @@ Generate a Bitcoin Taproot (P2TR: `bc1p...`) vanity address for **Ordinals**, on
 
 ## Changelog
 
+**v0.3**
+- Added `TARGET_NOPREF` parameter: search for a pattern at the start or end simultaneously
+- Returns the first match regardless of position (prefix or suffix)
+- Reduces average search time by ~2x compared to prefix-only or suffix-only for the same word
+
 **v0.2**
 - Added multi-pattern search support
 - Allows multiple prefix and/or suffix patterns
@@ -96,8 +101,9 @@ pip install bip_utils
 Open `vanity_wallet.py` and edit the `CONFIG` section at the top:
 
 ```python
-TARGET_PREFIX = ["dead", "cafe"]   # list of prefixes (bc1p[prefix]...); [] = disabled
+TARGET_PREFIX = ["dead", "cafe"]    # list of prefixes (bc1p[prefix]...); [] = disabled
 TARGET_SUFFIX = []                  # list of suffixes (bc1p...[suffix]); [] = disabled
+TARGET_NOPREF = []                  # list of patterns to match at start OR end (first found wins); [] = disabled
 ```
 
 Set at least one non-empty list. The script stops as soon as **any** pattern is matched -- searching for multiple patterns runs in parallel at no extra cost and reduces expected time proportionally. For example, 3 prefixes of the same length find a result ~3x faster on average than a single prefix.
