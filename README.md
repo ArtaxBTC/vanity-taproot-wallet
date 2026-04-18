@@ -8,6 +8,11 @@ Generate a Bitcoin Taproot (P2TR: `bc1p...`) vanity address for **Ordinals**, on
 
 ## Changelog
 
+**v0.4**
+- Added `TARGET_PREFIXANDSUFFIX` parameter: search for pairs `[prefix, suffix]` where both must match simultaneously (AND logic per pair)
+- Multiple pairs are supported (OR logic between pairs) — the first address matching any pair wins
+- Probability calculation and checkpoint tracking updated accordingly
+
 **v0.3**
 - Added `TARGET_NOPREF` parameter: search for a pattern at the start or end simultaneously
 - Returns the first match regardless of position (prefix or suffix)
