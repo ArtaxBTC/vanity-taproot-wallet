@@ -160,10 +160,10 @@ def _worker(target_prefixes, target_suffixes, target_nopref, target_prefixandsuf
             with counter.get_lock():
                 counter.value += 50
 
-        # Fixed prefix/suffix (AND logic: both must match if both defined)
-        prefix_ok = (not target_prefixes) or any(bc1p.startswith("bc1p" + p) for p in target_prefixes)
-        suffix_ok = (not target_suffixes) or any(bc1p.endswith(s) for s in target_suffixes)
-        combined_match = bool(target_prefixes or target_suffixes) and prefix_ok and suffix_ok
+        # Prefix/suffix patterns (OR logic: match any prefix OR any suffix independently)
+        prefix_match = bool(target_prefixes) and any(bc1p.startswith("bc1p" + p) for p in target_prefixes)
+        suffix_match = bool(target_suffixes) and any(bc1p.endswith(s) for s in target_suffixes)
+        combined_match = prefix_match or suffix_match
         # No-preference patterns (OR logic: match at start OR end)
         nopref_match = bool(target_nopref) and any(
             bc1p.startswith("bc1p" + w) or bc1p.endswith(w) for w in target_nopref
@@ -256,11 +256,7 @@ def main():
 
     n_workers  = WORKERS or os.cpu_count()
     n_patterns = len(prefixes) + len(suffixes) + len(nopref) + len(pairs)
-    if prefixes or suffixes:
-        p_combined = (sum(1.0 / 32**len(p) for p in prefixes) if prefixes else 1.0) * \
-                     (sum(1.0 / 32**len(s) for s in suffixes) if suffixes else 1.0)
-    else:
-        p_combined = 0.0
+    p_combined = sum(1.0 / 32**len(p) for p in prefixes) + sum(1.0 / 32**len(s) for s in suffixes)
     p_nopref = sum(2.0 / 32**len(w) for w in nopref)
     p_pairs  = sum(1.0 / 32**len(pr[0]) * (1.0 / 32**len(pr[1])) for pr in pairs)
     p_total  = p_combined + p_nopref + p_pairs
