@@ -8,6 +8,16 @@ Generate a Bitcoin Taproot (P2TR: `bc1p...`) vanity address for **Ordinals**, on
 
 ## Changelog
 
+**v0.5**
+- Added full web UI served by a local Flask server (port 5003): pattern builder, options, live mining stats, result display
+- Pattern import/export as JSON — save and reload your target lists across sessions
+- Pattern list pagination (10 per page) — supports up to 1024 patterns in a single pass
+- Checkpoint resume banner on page load — restores patterns and restarts mining in one click
+- Live SSE stream: attempts, speed (addr/s) and ETA update every 2 seconds during mining
+- "Feeling lucky, punk?" whole-address filters: **all-digit** (every char in `0–9`, 1 in 100 quintillion) and **all-letter** (every char in `a–z`, 1 in ~200 million) — checked against the full address body, not a fixed substring
+- Fixed broken `only_digits` / `only_letters` logic: previously injected a literal substring into `nopref` instead of checking every character of the address
+- `POST /api/result/clear` endpoint — "Purge RAM" button wipes the mnemonic from Flask's RAM.
+
 **v0.4**
 - Added `TARGET_PREFIXANDSUFFIX` parameter: search for pairs `[prefix, suffix]` where both must match simultaneously (AND logic per pair)
 - Multiple pairs are supported (OR logic between pairs) — the first address matching any pair wins
@@ -51,10 +61,9 @@ Generate a Bitcoin Taproot (P2TR: `bc1p...`) vanity address for **Ordinals**, on
 Bitcoin `bc1p` addresses use the **bech32m** alphabet. Only the following 32 characters are valid for your vanity pattern:
 
 ```
-q p z r y 9 x 8 g f 2 t v d w 0 s 3 j n 5 4 k h c e 6 m u a 7 l
+Valid chars: a–z, 0–9 (excluding b, i, o, 1 and all uppercase)
 ```
 
-The following characters are **excluded** (visual ambiguity): `b`, `i`, `o`, `1`, and all uppercase letters.
 
 ### Ordinals address, not the payment address
 
@@ -93,94 +102,50 @@ The generated mnemonic uses standard **BIP39** with **BIP86** derivation (`m/86'
 
 - **Python 3.8+**
 - **bip_utils**
+- **Flask** (for the web UI)
 
 ```bash
-pip install bip_utils
+pip install bip_utils flask
 ```
 
 ---
 
 ## Usage
 
-### 1. Configure your target
-
-Open `vanity_wallet.py` and edit the `CONFIG` section at the top:
-
-```python
-TARGET_PREFIX          = ["dead", "cafe"]       # list of prefixes (bc1p[prefix]...); [] = disabled
-TARGET_SUFFIX          = []                    # list of suffixes (bc1p...[suffix]); [] = disabled
-TARGET_NOPREF          = []                    # list of patterns to match at start OR end (first found wins); [] = disabled
-TARGET_PREFIXANDSUFFIX = [["dead", "cafe"]]    # list of [prefix, suffix] pairs (AND per pair, OR between pairs); [] = disabled
-```
-
-Set at least one non-empty list. The script stops as soon as **any** pattern is matched -- searching for multiple patterns runs in parallel at no extra cost and reduces expected time proportionally. For example, 3 prefixes of the same length find a result ~3x faster on average than a single prefix.
-
-### 2. Run the script
+### 1. Start the web UI
 
 ```bash
-python vanity_wallet.py
+python app.py
 ```
 
-At startup, the script benchmarks your CPU and displays an ETA:
+Then open **http://localhost:5003** in your browser.
 
-```
-=================================================================
-  vanity_wallet.py -- Bitcoin bc1p vanity address generator
-=================================================================
+### 2. Configure your target patterns
 
-  Target          : bc1p[dead]...
-  Expected tries  : 1,048,576  (32^4)
-  Workers         : 8 cores
-  Mnemonic        : 12 words
+In the **Search patterns** card, add one or more patterns using the pattern builder. Each row lets you set:
+- **Leading** — the address must start with this string (e.g. `dead`)
+- **Trailing** — the address must end with this string (e.g. `cafe`)
+- **OR mode** toggle — matches the pattern at the start **or** end (whichever comes first)
 
-  Benchmark (30 derivations on 1 core)...
-  Speed           : 45/s/core  ->  360/s total
-  ETA             : ~39 min  (~0.7h)
+The search stops as soon as **any** pattern is matched. Searching for multiple patterns runs in parallel at no extra cost and reduces expected time proportionally — 3 prefixes of the same length find a result ~3x faster on average than a single one.
 
-  Auto checkpoint : every 60s
-  Clean stop      : Ctrl+C  (counter will be saved)
+Use **Import** to load a previously exported `.json` pattern list, and **Export** to save your current list for later.
 
-  Starting...
-```
+Under **"Feeling lucky, punk?"**, you can add to your search an address where **every character** of the address body is a digit (`0–9`) or a letter (`a–z`), with no mixed characters.
 
-### 3. Stop and resume (checkpoint system)
+### 3. Set options and start
 
-Press **Ctrl+C** at any time for a clean stop. The current attempt counter is saved to `vanity_wallet_checkpoint.json`. Simply re-run the script the next day and it will resume from where it left off and display an adjusted ETA:
+In the **Options** card, choose your mnemonic length (12 or 24 words) and the number of CPU workers. Then click **Start mining**.
 
-```
-  [RESUMED] Session 2
-  Already done    : 8,450,000 attempts (25.5% of expected)
-  ETA remaining   : ~367 min  (~6.1h)
-```
+Live stats (attempts, speed, ETA) update every 2 seconds via a server-sent event stream. You can click **Stop** at any time for a clean pause — the current attempt counter is saved automatically to `vanity_wallet_checkpoint.json`.
 
-> The checkpoint tracks the **counter only**, not attempted mnemonics. Since the mnemonic space is ~2¹²⁸, the probability of generating a duplicate across sessions is negligible to the point of being cryptographically irrelevant, even running all the world's computers for the age of the universe would not make it likely.
+### 4. Resume and result
 
-### 4. Result
+If a checkpoint exists when you open the UI, a **resume banner** appears at the top. Click **Resume** to restore your patterns and restart mining from where you left off, or **Discard** to clear the checkpoint and start fresh.
 
-When a match is found, the mnemonic and addresses are displayed in the terminal and saved to `vanity_wallet_result.json`:
+When a match is found, the result section displays the `bc1p` Ordinals address, the `bc1q` payment address, and the full mnemonic. Write down the mnemonic on paper, then click **Purge RAM** to wipe the mnemonic from the server's RAM.
 
-```
-=================================================================
-  FOUND in 18432s  (2,750,000 attempts this session)
-  Total           : 11,200,000 attempts over 2 session(s)
-  Target          : bc1p[dead]...
-=================================================================
-
-  bc1p (ordinals)  : bc1pdead...
-  bc1q (payments)  : bc1q...
-
-  Mnemonic (12 words):
-     1. word1
-     ...
-    12. word12
-
-=================================================================
-  IMPORTANT:
-  1. Write down the mnemonic above before doing anything else
-  2. Shred vanity_wallet_result.json (use a file-shredding tool, not a simple delete)
-  3. Import the mnemonic into your wallet as a new standalone seed
-=================================================================
-```
+> The checkpoint tracks the **attempt counter only**, not attempted mnemonics. Since the mnemonic space is ~2¹²⁸, the probability of generating a duplicate across sessions is negligible to the point of being cryptographically irrelevant.
 
 ### 5. After import
 

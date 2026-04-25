@@ -5,12 +5,9 @@ Generates a Bitcoin Taproot P2TR (bc1p...) vanity wallet whose address starts an
 with a chosen string. Uses all CPU cores via multiprocessing
 (PBKDF2-HMAC-SHA512 is not GPU-friendly).
 
-Workflow:
-  1. Set TARGET_NOPREF, TARGET_PREFIX and/or TARGET_SUFFIX below
-  2. python vanity_wallet.py
-  3. Write down the displayed mnemonic
-  4. Shred vanity_wallet_result.json (before opening any wallet app)
-  5. Import the mnemonic into your wallet
+Can be used:
+  - CLI: python vanity_wallet.py  (reads CONFIG block below)
+  - As a module: from vanity_wallet import run; run(config, progress_cb, stop_event)
 
 Dependency: pip install bip_utils
 """
@@ -24,12 +21,12 @@ import multiprocessing
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-#  CONFIG
+#  CONFIG  (CLI mode only — UI mode receives config via run())
 # ---------------------------------------------------------------------------
-TARGET_PREFIX          = []                        # list of prefixes (bc1p[prefix]...); [] = disabled
+TARGET_PREFIX          = []  # list of prefixes (bc1p[prefix]...); [] = disabled
 TARGET_SUFFIX          = []                        # list of suffixes (bc1p...[suffix]); [] = disabled
-TARGET_NOPREF          = []                        # list of patterns to match at start OR end (first found wins); [] = disabled
-TARGET_PREFIXANDSUFFIX = [["dead", "cafe"]]         # list of [prefix, suffix] pairs (AND per pair, OR between pairs); [] = disabled
+TARGET_NOPREF          = []  # list of patterns to match at start OR end (first found wins); [] = disabled
+TARGET_PREFIXANDSUFFIX = [["dead", "cafe"]]                    # list of [prefix, suffix] pairs (AND per pair, OR between pairs); [] = disabled
 WALLET_INDEX  = 0              # BIP86 m/86'/0'/0'/0/{index} -- 0 = first wallet
 PASSPHRASE    = ""             # BIP39 passphrase (leave empty = none)
 WORDS_COUNT   = 12             # 12 or 24 words (12 = 128 bits, sufficient)
@@ -122,9 +119,13 @@ def _target_label():
 
 def _worker(target_prefixes, target_suffixes, target_nopref, target_prefixandsuffix,
             passphrase, wallet_index, words_count,
-            stop_event, result_queue, counter):
+            stop_event, result_queue, counter,
+            only_digits=False, only_letters=False):
     """Worker: generates random mnemonics and checks bc1p against all prefix/suffix patterns."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)  # workers ignore Ctrl+C
+    _DIGITS  = set('023456789')         # bech32m digits (1 excluded)
+    _LETTERS = set('qpzryx gftvdwsjnkhcemuаl') - {' '}  # placeholder — set below
+    _LETTERS = set('qpzryx8gf2tvdw0s3jn54khce6mua7l') - _DIGITS
     from bip_utils import (
         Bip39MnemonicGenerator, Bip39WordsNum,
         Bip39SeedGenerator, Bip86, Bip86Coins, Bip44Changes,
@@ -174,24 +175,37 @@ def _worker(target_prefixes, target_suffixes, target_nopref, target_prefixandsuf
             for pair in target_prefixandsuffix
         )
         match = combined_match or nopref_match or pnsuf_match
+        # Whole-address character-set checks (every char of bc1p[4:] must be in set)
+        addr_body = bc1p[4:]  # strip "bc1p"
+        charset_match = False
+        if not match and only_digits  and all(c in _DIGITS  for c in addr_body):
+            match = True
+            charset_match = True
+        if not match and only_letters and all(c in _LETTERS for c in addr_body):
+            match = True
+            charset_match = True
+
         if match:
-            matched_prefix = next((p for p in target_prefixes if bc1p.startswith("bc1p" + p)), "")
-            matched_suffix = next((s for s in target_suffixes if bc1p.endswith(s)), "")
-            if not matched_prefix and not matched_suffix and nopref_match:
-                # matched via TARGET_NOPREF -- find which word and which end
-                w = next((w for w in target_nopref if bc1p.startswith("bc1p" + w) or bc1p.endswith(w)), "")
-                if bc1p.startswith("bc1p" + w):
-                    matched_prefix = w
-                else:
-                    matched_suffix = w
-            if not matched_prefix and not matched_suffix and pnsuf_match:
-                # matched via TARGET_PREFIXANDSUFFIX
-                pair = next(
-                    (pr for pr in target_prefixandsuffix
-                     if bc1p.startswith("bc1p" + pr[0]) and bc1p.endswith(pr[1])), None
-                )
-                if pair:
-                    matched_prefix, matched_suffix = pair[0], pair[1]
+            if charset_match:
+                matched_prefix, matched_suffix = '', ''
+            else:
+                matched_prefix = next((p for p in target_prefixes if bc1p.startswith("bc1p" + p)), "")
+                matched_suffix = next((s for s in target_suffixes if bc1p.endswith(s)), "")
+                if not matched_prefix and not matched_suffix and nopref_match:
+                    # matched via TARGET_NOPREF -- find which word and which end
+                    w = next((w for w in target_nopref if bc1p.startswith("bc1p" + w) or bc1p.endswith(w)), "")
+                    if bc1p.startswith("bc1p" + w):
+                        matched_prefix = w
+                    else:
+                        matched_suffix = w
+                if not matched_prefix and not matched_suffix and pnsuf_match:
+                    # matched via TARGET_PREFIXANDSUFFIX
+                    pair = next(
+                        (pr for pr in target_prefixandsuffix
+                         if bc1p.startswith("bc1p" + pr[0]) and bc1p.endswith(pr[1])), None
+                    )
+                    if pair:
+                        matched_prefix, matched_suffix = pair[0], pair[1]
             # Also derive bc1q for reference
             bc1q = (
                 Bip84.FromSeed(seed, Bip84Coins.BITCOIN)
@@ -398,6 +412,197 @@ def main():
     with open(OUTPUT_FILE, 'w') as f:
         json.dump(out, f, indent=2)
     print(f"  Temporary save: {Path(OUTPUT_FILE).resolve()}")
+
+
+# ---------------------------------------------------------------------------
+#  MODULE ENTRY POINT  (called by app.py / UI)
+# ---------------------------------------------------------------------------
+
+def run(config, progress_cb=None, stop_event=None):
+    """
+    Run a vanity search with a config dict.  Can be called from app.py.
+
+    config keys:
+        prefixes            list[str]
+        suffixes            list[str]
+        nopref              list[str]
+        pairs               list[[str,str]]
+        passphrase          str
+        wallet_index        int
+        words_count         int  (12 or 24)
+        workers             int|None
+        checkpoint_file     str|Path|None
+        checkpoint_interval int  (seconds)
+
+    progress_cb(event_dict) — called periodically and on completion.
+    stop_event — threading.Event or multiprocessing.Event; set it to abort.
+
+    Returns the result dict on success, or None if stopped before a match.
+    """
+    import threading
+
+    prefixes   = [p for p in config.get("prefixes", []) if p]
+    suffixes   = [s for s in config.get("suffixes", []) if s]
+    nopref     = [w for w in config.get("nopref", []) if w]
+    pairs      = [p for p in config.get("pairs", []) if p and len(p) == 2 and p[0] and p[1]]
+    passphrase = config.get("passphrase", "")
+    wallet_index = int(config.get("wallet_index", 0))
+    words_count  = int(config.get("words_count", 12))
+    n_workers    = config.get("workers") or os.cpu_count()
+    ckpt_file    = Path(config["checkpoint_file"]) if config.get("checkpoint_file") else None
+    ckpt_interval = int(config.get("checkpoint_interval", 60))
+
+    only_digits  = bool(config.get("only_digits",  False))
+    only_letters = bool(config.get("only_letters", False))
+
+    # probability / expected
+    p_combined = sum(1.0 / 32**len(p) for p in prefixes) + sum(1.0 / 32**len(s) for s in suffixes)
+    p_nopref_  = sum(2.0 / 32**len(w) for w in nopref)
+    p_pairs_   = sum(1.0 / 32**len(pr[0]) * (1.0 / 32**len(pr[1])) for pr in pairs)
+    p_total    = p_combined + p_nopref_ + p_pairs_
+    # Add only_digits / only_letters to probability estimate
+    _DIGITS_SET  = set('023456789')
+    _LETTERS_SET = set('qpzryx8gf2tvdw0s3jn54khce6mua7l') - _DIGITS_SET
+    ADDR_LEN = 58  # bc1p address body length (after 'bc1p')
+    if only_digits:
+        p_total += (len(_DIGITS_SET)  / 32) ** ADDR_LEN
+    if only_letters:
+        p_total += (len(_LETTERS_SET) / 32) ** ADDR_LEN
+    expected   = int(1 / p_total) if p_total > 0 else 10**18
+
+    # checkpoint
+    prev_attempts, prev_sessions = 0, 0
+    if ckpt_file and ckpt_file.exists():
+        try:
+            with open(ckpt_file, encoding="utf-8") as f:
+                ck = json.load(f)
+            if (ck.get("prefixes") == prefixes and ck.get("suffixes") == suffixes
+                    and ck.get("nopref") == nopref and ck.get("pairs") == pairs
+                    and not ck.get("found")):
+                prev_attempts = int(ck.get("total_attempts", 0))
+                prev_sessions = int(ck.get("sessions", 0))
+        except Exception:
+            pass
+
+    def _save_ckpt(total, sessions, found=False):
+        if not ckpt_file:
+            return
+        try:
+            with open(ckpt_file, 'w', encoding="utf-8") as f:
+                json.dump({
+                    "prefixes": prefixes, "suffixes": suffixes,
+                    "nopref": nopref, "pairs": pairs,
+                    "total_attempts": total, "sessions": sessions,
+                    "expected": expected,
+                    "last_saved": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "found": found,
+                }, f, indent=2)
+        except Exception:
+            pass
+
+    # benchmark
+    rate_1 = _benchmark(passphrase, wallet_index, words_count, 20)
+    rate_n = rate_1 * n_workers
+
+    if progress_cb:
+        progress_cb({
+            "type": "start",
+            "expected": expected,
+            "rate": round(rate_n),
+            "prev_attempts": prev_attempts,
+            "prev_sessions": prev_sessions,
+            "workers": n_workers,
+        })
+
+    mp_stop  = multiprocessing.Event()
+    rq       = multiprocessing.Queue()
+    counter  = multiprocessing.Value('q', 0)
+
+    # honour external stop_event via a bridge thread
+    if stop_event is not None:
+        def _bridge():
+            while not stop_event.is_set() and not mp_stop.is_set():
+                time.sleep(0.25)
+            mp_stop.set()
+        threading.Thread(target=_bridge, daemon=True).start()
+
+    procs = [
+        multiprocessing.Process(
+            target=_worker,
+            args=(prefixes, suffixes, nopref, pairs, passphrase, wallet_index,
+                  words_count, mp_stop, rq, counter),
+            kwargs={"only_digits": only_digits, "only_letters": only_letters},
+            daemon=True,
+        )
+        for _ in range(n_workers)
+    ]
+    t0 = time.time()
+    last_ckpt = t0
+    for p in procs:
+        p.start()
+
+    result = None
+    try:
+        while not mp_stop.is_set():
+            time.sleep(2)
+            now     = time.time()
+            elapsed = now - t0
+            count   = counter.value
+            total   = prev_attempts + count
+            rate    = count / elapsed if elapsed > 0 else rate_n
+            remaining = max(0, expected - total)
+            eta_s   = remaining / rate if rate > 0 else 0
+            pct     = total / expected * 100
+
+            if progress_cb:
+                progress_cb({
+                    "type":     "progress",
+                    "total":    total,
+                    "rate":     round(rate),
+                    "pct":      round(pct, 1),
+                    "eta_s":    round(eta_s),
+                    "elapsed_s": round(elapsed),
+                })
+
+            if now - last_ckpt >= ckpt_interval:
+                _save_ckpt(total, prev_sessions + 1)
+                last_ckpt = now
+
+            if not rq.empty():
+                result = rq.get_nowait()
+                mp_stop.set()
+                break
+    except Exception:
+        mp_stop.set()
+
+    for p in procs:
+        p.join(timeout=3)
+
+    # drain queue in case result arrived during shutdown
+    if result is None and not rq.empty():
+        result = rq.get_nowait()
+
+    if result is not None:
+        count   = counter.value
+        total   = prev_attempts + count
+        elapsed = time.time() - t0
+        _save_ckpt(total, prev_sessions + 1, found=True)
+        result["attempts"]  = total
+        result["sessions"]  = prev_sessions + 1
+        result["elapsed_s"] = round(elapsed, 1)
+        result["words_count"]   = words_count
+        result["wallet_index"]  = wallet_index
+        if progress_cb:
+            progress_cb({"type": "found", "result": result})
+        return result
+
+    # stopped without finding
+    count = counter.value
+    total = prev_attempts + count
+    _save_ckpt(total, prev_sessions + 1)
+    if progress_cb:
+        progress_cb({"type": "stopped", "total": total})
+    return None
 
 
 if __name__ == "__main__":
