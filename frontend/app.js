@@ -45,9 +45,10 @@ function _flushPage() {
   $('patternList').querySelectorAll('.pattern-block').forEach((block, i) => {
     if (start + i >= _patterns.length) return;
     _patterns[start + i] = {
-      leading:  block.querySelector('input[id^="lead_"]').value.trim(),
-      trailing: block.querySelector('input[id^="trail_"]').value.trim(),
-      or_mode:  block.querySelector('input[type=checkbox]').checked,
+      leading:   block.querySelector('input[id^="lead_"]').value.trim(),
+      trailing:  block.querySelector('input[id^="trail_"]').value.trim(),
+      or_mode:   block.querySelector('input[type=checkbox]').checked,
+      addr_type: (block.querySelector('input[type=radio]:checked')?.value) || 'bc1p',
     };
   });
 }
@@ -102,14 +103,28 @@ function _buildPatternBlock(data, globalIndex) {
 
   row.append(fldLead, fldTrail, rmBtn);
 
-  // Footer: OR mode checkbox + ETA
+  // Footer: OR mode checkbox + address type selector + ETA
   const footer  = el('div', { class: 'pattern-footer' });
   const orLabel = el('label', { class: 'checkbox-row' });
   const orChk   = el('input', { type: 'checkbox' });
   orChk.checked = data.or_mode || false;
   orLabel.append(orChk, document.createTextNode(' OR mode (either end — halves search time)'));
+
+  // bc1p / bc1q radio selector
+  const addrTypeRow = el('div', { style: 'display:flex;gap:12px;margin-top:4px;align-items:center' });
+  const radioName   = `addrtype_${globalIndex}`;
+  const lblBc1p  = el('label', { style: 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.8rem;color:var(--text)' });
+  const rBc1p    = el('input', { type: 'radio', name: radioName, value: 'bc1p' });
+  rBc1p.checked  = (data.addr_type !== 'bc1q');
+  lblBc1p.append(rBc1p, document.createTextNode('bc1p'));
+  const lblBc1q  = el('label', { style: 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.8rem;color:var(--text)' });
+  const rBc1q    = el('input', { type: 'radio', name: radioName, value: 'bc1q' });
+  rBc1q.checked  = (data.addr_type === 'bc1q');
+  lblBc1q.append(rBc1q, document.createTextNode('bc1q'));
+  addrTypeRow.append(lblBc1p, lblBc1q);
+
   const etaSpan = el('span', { style: 'font-size:.75rem;color:var(--text-dim)' });
-  footer.append(orLabel, etaSpan);
+  footer.append(orLabel, addrTypeRow, etaSpan);
 
   function _updateEta() {
     const lead  = inpLead.value.trim();
@@ -145,9 +160,10 @@ function _buildPatternBlock(data, globalIndex) {
 function addPatternBlock(data) {
   _flushPage();
   _patterns.push({
-    leading:  (data && data.leading)  || '',
-    trailing: (data && data.trailing) || '',
-    or_mode:  !!(data && data.or_mode),
+    leading:   (data && data.leading)   || '',
+    trailing:  (data && data.trailing)  || '',
+    or_mode:   !!(data && data.or_mode),
+    addr_type: (data && data.addr_type) || 'bc1p',
   });
   _renderPatterns(Math.ceil(_patterns.length / PAT_PAGE_SIZE));
 }
@@ -170,7 +186,7 @@ $('patPgInput').addEventListener('change', () => {
 $('btnAddPattern').addEventListener('click', e => { e.preventDefault(); addPatternBlock(); });
 
 // Start with one empty pattern row
-_patterns.push({ leading: '', trailing: '', or_mode: false });
+_patterns.push({ leading: '', trailing: '', or_mode: false, addr_type: 'bc1p' });
 _renderPatterns(1);
 
 // ── Collect patterns ──────────────────────────────────────────────────────
@@ -200,9 +216,10 @@ $('importFile').addEventListener('change', e => {
       const arr = JSON.parse(ev.target.result);
       if (!Array.isArray(arr)) throw new Error('Expected array');
       const imported = arr.map(p => ({
-        leading:  ((p.leading  || '').toLowerCase().replace(/[^qpzry9x8gf2tvdw0s3jn54khce6mua7l]/g, '')),
-        trailing: ((p.trailing || '').toLowerCase().replace(/[^qpzry9x8gf2tvdw0s3jn54khce6mua7l]/g, '')),
-        or_mode:  !!p.or_mode,
+        leading:   ((p.leading  || '').toLowerCase().replace(/[^qpzry9x8gf2tvdw0s3jn54khce6mua7l]/g, '')),
+        trailing:  ((p.trailing || '').toLowerCase().replace(/[^qpzry9x8gf2tvdw0s3jn54khce6mua7l]/g, '')),
+        or_mode:   !!p.or_mode,
+        addr_type: (p.addr_type === 'bc1q') ? 'bc1q' : 'bc1p',
       })).filter(p => p.leading || p.trailing);
       if (!imported.length) throw new Error('No valid patterns');
       _patterns = imported;
@@ -262,10 +279,14 @@ $('btnCkptResume').addEventListener('click', () => {
 
   // Reconstruct pattern list from checkpoint
   const restored = [];
-  (_ckptData.prefixes || []).forEach(p  => restored.push({ leading: p,    trailing: '',    or_mode: false }));
-  (_ckptData.suffixes || []).forEach(s  => restored.push({ leading: '',    trailing: s,     or_mode: false }));
-  (_ckptData.nopref   || []).forEach(n  => restored.push({ leading: n,    trailing: '',    or_mode: true  }));
-  (_ckptData.pairs    || []).forEach(pr => restored.push({ leading: pr[0], trailing: pr[1], or_mode: false }));
+  (_ckptData.prefixes || []).forEach(p  => restored.push({ leading: p,    trailing: '',    or_mode: false, addr_type: 'bc1p' }));
+  (_ckptData.suffixes || []).forEach(s  => restored.push({ leading: '',    trailing: s,     or_mode: false, addr_type: 'bc1p' }));
+  (_ckptData.nopref   || []).forEach(n  => restored.push({ leading: n,    trailing: '',    or_mode: true,  addr_type: 'bc1p' }));
+  (_ckptData.pairs    || []).forEach(pr => restored.push({ leading: pr[0], trailing: pr[1], or_mode: false, addr_type: 'bc1p' }));
+  (_ckptData.bc1q_prefixes || []).forEach(p  => restored.push({ leading: p,    trailing: '',    or_mode: false, addr_type: 'bc1q' }));
+  (_ckptData.bc1q_suffixes || []).forEach(s  => restored.push({ leading: '',    trailing: s,     or_mode: false, addr_type: 'bc1q' }));
+  (_ckptData.bc1q_nopref   || []).forEach(n  => restored.push({ leading: n,    trailing: '',    or_mode: true,  addr_type: 'bc1q' }));
+  (_ckptData.bc1q_pairs    || []).forEach(pr => restored.push({ leading: pr[0], trailing: pr[1], or_mode: false, addr_type: 'bc1q' }));
 
   if (restored.length) {
     _patterns = restored;
@@ -329,6 +350,9 @@ async function startMining() {
 }
 
 async function stopMining() {
+  const btn = $('btnStop');
+  btn.textContent = 'Stopping…';
+  btn.disabled = true;
   await fetch(`${API}/api/stop`, { method: 'POST' });
 }
 
@@ -396,6 +420,7 @@ function openSSE() {
       _sse.close(); _sse = null;
       _running = false;
       setRunningUI(false);
+      $('btnStop').textContent = 'Stop';
       $('mineStatusLabel').textContent = 'Stopped';
       $('mineStatusLabel').style.color = 'var(--text-dim)';
       $('progressSection').style.display = 'block';
@@ -421,27 +446,37 @@ async function fetchAndShowResult() {
   $('mineStatusLabel').style.color = 'var(--green)';
   $('progressSection').style.display = 'block';
 
-  // Highlight matched prefix/suffix in address
-  const addr = d.bc1p || '';
-  const mp   = d.matched_prefix || '';
-  const ms   = d.matched_suffix || '';
-  const addrEl = $('resAddress');
-  addrEl.innerHTML = '';
-  if (mp && addr.startsWith('bc1p' + mp)) {
-    addrEl.appendChild(document.createTextNode('bc1p'));
-    addrEl.appendChild(Object.assign(el('span', { class: 'highlight' }), { textContent: mp }));
-    const rest = addr.slice(4 + mp.length);
-    if (ms && rest.endsWith(ms)) {
-      addrEl.appendChild(document.createTextNode(rest.slice(0, -ms.length)));
-      addrEl.appendChild(Object.assign(el('span', { class: 'highlight' }), { textContent: ms }));
+  // Highlight matched prefix/suffix in the winning address
+  const matchedType = d.matched_addr_type || 'bc1p';
+  const addr  = d.bc1p || '';
+  const addrQ = d.bc1q || '';
+  const mp    = d.matched_prefix || '';
+  const ms    = d.matched_suffix || '';
+
+  function _renderAddr(addrEl, addrStr, prefix) {
+    addrEl.innerHTML = '';
+    if (mp && addrStr.startsWith(prefix + mp)) {
+      addrEl.appendChild(document.createTextNode(prefix));
+      addrEl.appendChild(Object.assign(el('span', { class: 'highlight' }), { textContent: mp }));
+      const rest = addrStr.slice(prefix.length + mp.length);
+      if (ms && rest.endsWith(ms)) {
+        addrEl.appendChild(document.createTextNode(rest.slice(0, -ms.length)));
+        addrEl.appendChild(Object.assign(el('span', { class: 'highlight' }), { textContent: ms }));
+      } else {
+        addrEl.appendChild(document.createTextNode(rest));
+      }
     } else {
-      addrEl.appendChild(document.createTextNode(rest));
+      addrEl.textContent = addrStr;
     }
-  } else {
-    addrEl.textContent = addr;
   }
 
-  $('resAddressQ').textContent = d.bc1q || '';
+  if (matchedType === 'bc1p') {
+    _renderAddr($('resAddress'), addr, 'bc1p');
+    $('resAddressQ').textContent = addrQ;
+  } else {
+    $('resAddress').textContent = addr;
+    _renderAddr($('resAddressQ'), addrQ, 'bc1q');
+  }
 
   // Mnemonic grid
   const grid = $('resMnemonic');
@@ -473,7 +508,7 @@ $('btnPurgeRAM').addEventListener('click', async () => {
   $('mineStatusLabel').textContent = '⛏ Mining…';
   $('mineStatusLabel').style.color = 'var(--accent)';
   $('mineElapsed').textContent  = '';
-  _patterns = [{ leading: '', trailing: '', or_mode: false }];
+  _patterns = [{ leading: '', trailing: '', or_mode: false, addr_type: 'bc1p' }];
   $('patternList').innerHTML = '';
   _renderPatterns(1);
   window.scrollTo({ top: 0, behavior: 'smooth' });

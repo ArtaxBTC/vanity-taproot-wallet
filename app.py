@@ -114,40 +114,52 @@ def start():
         return jsonify({"error": "no patterns"}), 400
 
     prefixes, suffixes, nopref, pairs = [], [], [], []
+    bc1q_prefixes, bc1q_suffixes, bc1q_nopref, bc1q_pairs = [], [], [], []
     for pat in patterns:
-        lead    = (pat.get("leading") or "").strip().lower()
-        trail   = (pat.get("trailing") or "").strip().lower()
-        or_mode = bool(pat.get("or_mode"))
+        lead      = (pat.get("leading") or "").strip().lower()
+        trail     = (pat.get("trailing") or "").strip().lower()
+        or_mode   = bool(pat.get("or_mode"))
+        addr_type = pat.get("addr_type", "bc1p")
+
+        target_pfx  = bc1q_prefixes if addr_type == "bc1q" else prefixes
+        target_sfx  = bc1q_suffixes if addr_type == "bc1q" else suffixes
+        target_np   = bc1q_nopref   if addr_type == "bc1q" else nopref
+        target_pair = bc1q_pairs    if addr_type == "bc1q" else pairs
 
         if lead and trail and not or_mode:
-            pairs.append([lead, trail])
+            target_pair.append([lead, trail])
         elif lead and trail and or_mode:
             # OR mode with both → each end independently
             nopref_style = pat.get("nopref_style", False)
             if nopref_style:
-                nopref.append(lead)
-                nopref.append(trail)
+                target_np.append(lead)
+                target_np.append(trail)
             else:
-                prefixes.append(lead)
-                suffixes.append(trail)
+                target_pfx.append(lead)
+                target_sfx.append(trail)
         elif lead and or_mode:
-            nopref.append(lead)
+            target_np.append(lead)
         elif lead:
-            prefixes.append(lead)
+            target_pfx.append(lead)
         elif trail:
-            suffixes.append(trail)
+            target_sfx.append(trail)
 
     # de-dup
-    prefixes = list(dict.fromkeys(prefixes))
-    suffixes = list(dict.fromkeys(suffixes))
-    nopref   = list(dict.fromkeys(nopref))
+    prefixes      = list(dict.fromkeys(prefixes))
+    suffixes      = list(dict.fromkeys(suffixes))
+    nopref        = list(dict.fromkeys(nopref))
+    bc1q_prefixes = list(dict.fromkeys(bc1q_prefixes))
+    bc1q_suffixes = list(dict.fromkeys(bc1q_suffixes))
+    bc1q_nopref   = list(dict.fromkeys(bc1q_nopref))
 
     if not prefixes and not suffixes and not nopref and not pairs \
+            and not bc1q_prefixes and not bc1q_suffixes and not bc1q_nopref and not bc1q_pairs \
             and not data.get("only_digits") and not data.get("only_letters"):
         return jsonify({"error": "no valid patterns after parsing"}), 400
 
-    # validate chars
-    all_chars = "".join(prefixes + suffixes + nopref + [c for p in pairs for c in p])
+    # validate chars (same bech32/bech32m charset for both bc1p and bc1q)
+    all_chars = "".join(prefixes + suffixes + nopref + [c for p in pairs for c in p]
+                        + bc1q_prefixes + bc1q_suffixes + bc1q_nopref + [c for p in bc1q_pairs for c in p])
     bad = [c for c in all_chars if c not in vw.BECH32M_CHARSET]
     if bad:
         return jsonify({"error": f"Invalid bech32m characters: {''.join(sorted(set(bad)))}"}), 400
@@ -157,6 +169,10 @@ def start():
         "suffixes":      suffixes,
         "nopref":        nopref,
         "pairs":         pairs,
+        "bc1q_prefixes": bc1q_prefixes,
+        "bc1q_suffixes": bc1q_suffixes,
+        "bc1q_nopref":   bc1q_nopref,
+        "bc1q_pairs":    bc1q_pairs,
         "passphrase":    data.get("passphrase", ""),
         "wallet_index":  int(data.get("wallet_index", 0)),
         "words_count":   int(data.get("words_count", 12)),

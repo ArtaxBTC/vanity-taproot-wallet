@@ -8,6 +8,14 @@ Generate a Bitcoin Taproot (P2TR: `bc1p...`) vanity address for **Ordinals**, on
 
 ## Changelog
 
+**v0.6**
+- Added `bc1q` (P2WPKH / Native SegWit) vanity search support alongside `bc1p`
+- Per-pattern address type selector in the UI: each pattern row has a **bc1p / bc1q** radio toggle — bc1p and bc1q patterns run in parallel at no extra cost
+- New CLI config variables: `TARGET_BC1Q_PREFIX`, `TARGET_BC1Q_SUFFIX`, `TARGET_BC1Q_NOPREF`, `TARGET_BC1Q_PREFIXANDSUFFIX` — same logic as their bc1p counterparts but for BIP84 `m/84'/0'/0'/0/{index}` addresses
+- bc1q derivation is skipped entirely when no bc1q patterns are configured (zero performance overhead)
+- Result display highlights the matched address type (`bc1p` or `bc1q`) in both UI and CLI output
+- Stop button now shows **Stopping…** while the mining processes are shutting down
+
 **v0.5**
 - Added full web UI served by a local Flask server (port 5003): pattern builder, options, live mining stats, result display
 - Pattern import/export as JSON — save and reload your target lists across sessions
