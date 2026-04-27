@@ -98,6 +98,7 @@ function _buildPatternBlock(data, globalIndex) {
     _flushPage();
     _patterns.splice(globalIndex, 1);
     if (_patterns.length === 0) _patterns.push({ leading: '', trailing: '', or_mode: false });
+    $('patternList').innerHTML = '';
     _renderPatterns(_patPage);
   });
 
