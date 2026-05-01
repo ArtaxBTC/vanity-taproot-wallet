@@ -1,0 +1,500 @@
+/* ──────────────────────────────────────────────
+   Vanity Wallet UI  |  dark-mode stylesheet
+   Background: #0f0f0f  Accent: #f7931a (bitcoin orange)
+   ────────────────────────────────────────────── */
+
+:root {
+  --bg:        #0f0f0f;
+  --bg2:       #1a1a1a;
+  --bg3:       #252525;
+  --border:    #2e2e2e;
+  --text:      #e8e8e8;
+  --text-dim:  #7a7a7a;
+  --accent:    #f7931a;
+  --accent2:   #ffb347;
+  --green:     #22c55e;
+  --red:       #ef4444;
+  --radius:    10px;
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Consolas', 'Cascadia Code', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+
+body {
+  background:     var(--bg);
+  color:          var(--text);
+  font-family:    var(--font-sans);
+  min-height:     100vh;
+  display:        flex;
+  flex-direction: column;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ─────────────  HEADER  ───────────── */
+
+header {
+  position:        sticky;
+  top:             0;
+  z-index:         100;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     flex-start;
+  justify-content: center;
+  padding:         0 24px;
+  height:          62px;
+  background:      rgba(15,15,15,.95);
+  border-bottom:   1px solid var(--border);
+  backdrop-filter: blur(6px);
+  text-align:      center;
+}
+
+.logo {
+  font-size:      1.15rem;
+  font-weight:    700;
+  letter-spacing: -0.4px;
+  color:          var(--text);
+}
+.logo .v2 { color: var(--accent); }
+
+.header-sub {
+  font-size:  .8rem;
+  color:      var(--text-dim);
+}
+
+/* ─────────────  MAIN  ───────────── */
+
+main {
+  flex:           1;
+  max-width:      960px;
+  width:          100%;
+  margin:         0 auto;
+  padding:        28px 20px 80px;
+  display:        flex;
+  flex-direction: column;
+  gap:            20px;
+}
+
+/* ─────────────  CARD  ───────────── */
+
+.card {
+  background:    var(--bg2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius);
+  padding:       22px 24px;
+}
+
+.card h2 {
+  font-size:     1.05rem;
+  font-weight:   700;
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  margin-bottom: 16px;
+}
+
+.step-num {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           26px;
+  height:          26px;
+  border-radius:   50%;
+  background:      var(--bg3);
+  border:          1px solid var(--border);
+  font-size:       .82rem;
+  font-weight:     700;
+  color:           var(--accent);
+  flex-shrink:     0;
+}
+
+.hint {
+  font-size:  .82rem;
+  color:      var(--text-dim);
+  margin-top: 6px;
+}
+
+/* ─────────────  FORM ELEMENTS  ───────────── */
+
+label {
+  display:       block;
+  font-size:     .82rem;
+  font-weight:   600;
+  color:         var(--text-dim);
+  margin-bottom: 5px;
+}
+
+input[type=text],
+input[type=number],
+select {
+  width:         100%;
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  border-radius: 7px;
+  padding:       8px 12px;
+  color:         var(--text);
+  font-size:     .9rem;
+  font-family:   var(--font-mono);
+  outline:       none;
+  transition:    border-color .15s;
+}
+input[type=text]:focus,
+input[type=number]:focus,
+select:focus { border-color: var(--accent); }
+
+select { font-family: var(--font-sans); cursor: pointer; }
+
+.checkbox-row {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+  font-size:   .85rem;
+  cursor:      pointer;
+  user-select: none;
+  margin-top:  4px;
+}
+.checkbox-row input[type=checkbox] {
+  width:  15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ─────────────  BUTTONS  ───────────── */
+
+button {
+  cursor:        pointer;
+  border:        none;
+  border-radius: 7px;
+  font-family:   var(--font-sans);
+  font-weight:   600;
+  transition:    opacity .15s, background .15s;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color:      #000;
+  padding:    10px 22px;
+  font-size:  .92rem;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent2); }
+.btn-primary:disabled { opacity: .35; cursor: not-allowed; }
+
+.btn-ghost {
+  background: var(--bg3);
+  border:     1px solid var(--border);
+  color:      var(--text);
+  padding:    8px 16px;
+  font-size:  .85rem;
+}
+.btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn-ghost:disabled { opacity: .35; cursor: not-allowed; }
+
+.btn-danger {
+  background: transparent;
+  border:     1px solid rgba(239,68,68,.4);
+  color:      var(--red);
+  padding:    8px 16px;
+  font-size:  .85rem;
+}
+.btn-danger:hover { background: rgba(239,68,68,.1); border-color: var(--red); }
+
+.btn-xs {
+  padding:   4px 10px;
+  font-size: .78rem;
+}
+
+.add-link {
+  display:         inline-block;
+  color:           var(--accent);
+  font-size:       .85rem;
+  font-weight:     600;
+  text-decoration: none;
+  cursor:          pointer;
+  margin-top:      8px;
+}
+.add-link:hover { text-decoration: underline; }
+
+/* ─────────────  PATTERN BLOCKS  ───────────── */
+
+.pattern-list { display: flex; flex-direction: column; gap: 10px; }
+
+.pattern-block {
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  border-radius: 8px;
+  padding:       14px 16px;
+}
+
+.pattern-block-row {
+  display: flex;
+  gap:     10px;
+  align-items: flex-end;
+}
+.pattern-block-row .field { flex: 1; }
+
+.pattern-remove {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           28px;
+  height:          28px;
+  border-radius:   6px;
+  background:      transparent;
+  border:          1px solid transparent;
+  color:           var(--red);
+  font-size:       1rem;
+  cursor:          pointer;
+  flex-shrink:     0;
+  margin-bottom:   1px;
+  transition:      background .15s, color .15s;
+}
+.pattern-remove:hover { background: rgba(239,68,68,.12); color: var(--red); border-color: rgba(239,68,68,.3); }
+
+.pattern-footer {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     center;
+  margin-top:      8px;
+}
+
+/* ─────────────  SYNTHETICS  ───────────── */
+
+.synthetic-row {
+  display:     flex;
+  gap:         20px;
+  flex-wrap:   wrap;
+  margin-top:  4px;
+}
+
+/* ─────────────  ADVANCED OPTIONS  ───────────── */
+
+.field-row {
+  display:   grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap:       12px;
+  margin-top: 4px;
+}
+
+/* ─────────────  ACTION BAR  ───────────── */
+
+.action-bar {
+  display:     flex;
+  gap:         10px;
+  align-items: center;
+  flex-wrap:   wrap;
+}
+
+/* ─────────────  PROGRESS  ───────────── */
+
+.progress-wrap {
+  background:    var(--bg3);
+  border-radius: 6px;
+  height:        8px;
+  overflow:      hidden;
+  margin:        12px 0;
+}
+.progress-bar {
+  height:     100%;
+  background: var(--accent);
+  width:      0%;
+  transition: width .5s ease;
+  border-radius: 6px;
+}
+
+.stats-grid {
+  display:               grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:                   12px;
+  margin-top:            12px;
+}
+.stat-box {
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  border-radius: 8px;
+  padding:       12px 14px;
+  text-align:    center;
+}
+.stat-label {
+  font-size:   .72rem;
+  color:       var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-size:  1.1rem;
+  font-weight: 700;
+  color:      var(--text);
+}
+
+/* ─────────────  RESULT  ───────────── */
+
+.result-address {
+  font-family:   var(--font-mono);
+  font-size:     .92rem;
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  border-radius: 7px;
+  padding:       10px 14px;
+  word-break:    break-all;
+  margin:        6px 0 14px;
+}
+.result-address .highlight { color: var(--accent); font-weight: 700; }
+
+.mnemonic-grid {
+  display:               grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:                   8px;
+  margin:                12px 0;
+}
+.mnemonic-word {
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  border-radius: 7px;
+  padding:       7px 10px;
+  font-size:     .85rem;
+}
+.mnemonic-word .num {
+  color:       var(--text-dim);
+  font-size:   .7rem;
+  margin-right: 4px;
+}
+
+.warning-box {
+  background:    rgba(239,68,68,.08);
+  border:        1px solid rgba(239,68,68,.3);
+  border-radius: 8px;
+  padding:       12px 16px;
+  font-size:     .83rem;
+  color:         #f8a;
+  margin-top:    14px;
+}
+.warning-box strong { color: var(--red); }
+
+/* ─────────────  IMPORT / EXPORT  ───────────── */
+
+.import-export-row {
+  display:     flex;
+  gap:         8px;
+  margin-top:  8px;
+  flex-wrap:   wrap;
+  align-items: center;
+}
+
+/* ─────────────  CHECKPOINT BANNER  ───────────── */
+
+#checkpointBanner {
+  background:    rgba(247,147,26,.08);
+  border:        1px solid rgba(247,147,26,.3);
+  border-radius: 8px;
+  padding:       10px 16px;
+  font-size:     .83rem;
+  display:       none;
+  align-items:   center;
+  justify-content: space-between;
+  gap:           12px;
+  flex-wrap:     wrap;
+}
+#checkpointBanner .ckpt-info { color: var(--accent); }
+
+/* ─────────────  PAGER  ───────────── */
+
+.gallery-pager {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  margin-top:  12px;
+  justify-content: center;
+}
+.pager-btn {
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  color:         var(--text);
+  border-radius: 5px;
+  padding:       4px 10px;
+  font-size:     1rem;
+  cursor:        pointer;
+  line-height:   1;
+  transition:    border-color .15s, color .15s;
+}
+.pager-btn:hover:not(:disabled)  { border-color: var(--accent); color: var(--accent); }
+.pager-btn:disabled               { opacity: .3; cursor: not-allowed; }
+
+.pattern-remove {
+  display:        inline-flex;
+  align-items:    center;
+  justify-content: center;
+  width:          28px;
+  height:         28px;
+  padding:        0;
+  flex-shrink:    0;
+  background:     none;
+  border:         none;
+  border-radius:  6px;
+  color:          var(--red);
+  cursor:         pointer;
+  font-size:      1rem;
+  line-height:    1;
+  transition:     background .15s;
+}
+.pattern-remove:hover { background: rgba(239,68,68,.15); }
+.pager-input {
+  width:         72px !important;
+  text-align:    center;
+  padding:       4px 6px;
+  font-size:     .85rem;
+  margin:        0;
+  font-family:   inherit;
+}
+.pager-total {
+  font-size:  .85rem;
+  color:      var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ─────────────  FOOTER BAR  ───────────── */
+
+.fee-bar {
+  position:     fixed;
+  bottom:       0;
+  left:         0;
+  right:        0;
+  height:       34px;
+  display:      flex;
+  align-items:  center;
+  gap:          10px;
+  padding:      0 20px;
+  background:   rgba(15,15,15,.97);
+  border-top:   1px solid var(--border);
+  font-size:    .78rem;
+  color:        var(--text-dim);
+  z-index:      50;
+}
+
+/* ─────────────  CUSTOM TOOLTIP (data-tip)  ───────────── */
+[data-tip] { position: relative; }
+
+[data-tip]:hover::after {
+  content:        attr(data-tip);
+  position:       absolute;
+  top:            calc(100% + 6px);
+  left:           50%;
+  transform:      translateX(-50%);
+  background:     var(--bg3);
+  border:         1px solid var(--border);
+  border-radius:  6px;
+  color:          var(--text);
+  font-size:      .72rem;
+  padding:        4px 8px;
+  white-space:    nowrap;
+  pointer-events: none;
+  z-index:        200;
+  box-shadow:     0 2px 8px rgba(0,0,0,.4);
+}
+

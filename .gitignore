@@ -1,0 +1,12 @@
+# Generated output files -- NEVER commit these, they may contain your mnemonic
+vanity_wallet_result.json
+vanity_wallet_checkpoint.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db

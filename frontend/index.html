@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SeedCraft — Ordinals</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>if (new URLSearchParams(location.search).get('embed') === '1') { const s = document.createElement('style'); s.textContent = 'header{display:none!important}'; document.head.appendChild(s); }</script>
+</head>
+<body>
+
+  <!-- ━━━━━━━━━━  HEADER  ━━━━━━━━━━ -->
+  <header>
+    <div class="logo">Seed<span style="color:var(--accent)">Craft</span></div>
+    <div class="header-sub">Local Mnemonic Crafting</div>
+  </header>
+
+  <main>
+
+  <!-- ━━━━━━━━━━  CHECKPOINT BANNER  ━━━━━━━━━━ -->
+  <div id="checkpointBanner">
+    <span class="ckpt-info" id="ckptInfo">Previous session detected.</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-xs" id="btnCkptResume">Resume</button>
+      <button class="btn-danger btn-xs" id="btnCkptClear">Discard</button>
+    </div>
+  </div>
+
+  <!-- ━━━━━━━━━━  STEP 1 — PATTERNS  ━━━━━━━━━━ -->
+  <section class="card">
+    <h2><span class="step-num">1</span> Search patterns</h2>
+
+    <div class="pattern-list" id="patternList"></div>
+    <div id="patternPager" class="gallery-pager" style="display:none">
+      <button class="pager-btn" id="patPgFirst" data-tip="First page">&#171;</button>
+      <button class="pager-btn" id="patPgPrev"  data-tip="Previous page">&#8249;</button>
+      <input  type="number" id="patPgInput" class="pager-input" min="1" value="1" autocomplete="off" />
+      <span   id="patPgTotal" class="pager-total">/ 1</span>
+      <button class="pager-btn" id="patPgNext"  data-tip="Next page">&#8250;</button>
+      <button class="pager-btn" id="patPgLast"  data-tip="Last page">&#187;</button>
+    </div>
+    <a class="add-link" id="btnAddPattern" href="#">+ Add search pattern</a>
+
+    <!-- Lucky Wheel -->
+    <div style="margin-top:18px;margin-bottom:6px">
+      <label style="color:var(--text);font-size:.88rem;font-weight:700;margin-bottom:8px;display:block">Feeling lucky, punk?</label>
+      <div class="synthetic-row">
+        <label class="checkbox-row">
+          <input type="checkbox" id="chkOnlyDigits" />
+          Add all-digit address <span style="color:var(--text-dim);font-size:.78rem;margin-left:4px">(1 in 100 quintillion chance)</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="chkOnlyLetters" />
+          Add all-letter address <span style="color:var(--text-dim);font-size:.78rem;margin-left:4px">(1 in ~200 million chance)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Import / export -->
+    <div class="import-export-row">
+      <button class="btn-ghost btn-xs" id="btnImportPatterns">Import patterns JSON</button>
+      <button class="btn-ghost btn-xs" id="btnExportPatterns">Export patterns JSON</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none" />
+    </div>
+
+    <p class="hint">
+      Each pattern row targets one vanity string. <strong>Leading</strong> = address starts with <code style="color:var(--accent)">bc1p[text]</code> or <code style="color:var(--accent)">bc1q[text]</code>.
+      <strong>Trailing</strong> = address ends with <code style="color:var(--accent)">[text]</code>.
+      Choose <strong>bc1p</strong> (Ordinals / Taproot) or <strong>bc1q</strong> (Payment / SegWit) per pattern row — both use the same character set so search time is identical.
+      Check <em>OR mode</em> to match either end.
+      Leave <em>OR mode</em> unchecked with both fields filled to require both simultaneously.
+      <span style="color:var(--accent)">Valid chars: a–z, 0–9 (excluding b, i, o, 1 and all uppercase)</span>
+    </p>
+  </section>
+
+  <!-- ━━━━━━━━━━  STEP 2 — OPTIONS  ━━━━━━━━━━ -->
+  <section class="card">
+    <h2><span class="step-num">2</span> Options</h2>
+    <div class="field-row">
+      <div>
+        <label for="selWords">Mnemonic length</label>
+        <select id="selWords">
+          <option value="12" selected>12 words (recommended)</option>
+          <option value="24">24 words</option>
+        </select>
+      </div>
+      <div>
+        <label for="inpWorkers">CPU workers</label>
+        <input type="number" id="inpWorkers" placeholder="auto (all cores)" min="1" max="64" autocomplete="off" style="font-family:var(--font-mono)" />
+      </div>
+    </div>
+    <p class="hint" id="benchmarkInfo" style="margin-top:10px">Loading benchmark…</p>
+  </section>
+
+  <!-- ━━━━━━━━━━  STEP 3 — RUN  ━━━━━━━━━━ -->
+  <section class="card">
+    <h2><span class="step-num">3</span> Run</h2>
+    <div class="action-bar">
+      <button class="btn-primary" id="btnStart">▶ Start mining</button>
+      <button class="btn-danger"  id="btnStop" disabled>■ Stop</button>
+    </div>
+    <p class="hint" id="etaInfo" style="margin-top:10px"></p>
+
+    <!-- inline mining status -->
+    <div id="progressSection" style="display:none;margin-top:18px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="color:var(--accent);font-weight:700;font-size:.95rem" id="mineStatusLabel">⛏ Mining…</span>
+        <span style="font-size:.8rem;color:var(--text-dim)" id="mineElapsed"></span>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="stats-grid" style="margin-top:12px">
+        <div class="stat-box">
+          <div class="stat-label">Attempts</div>
+          <div class="stat-value" id="statAttempts">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Speed</div>
+          <div class="stat-value" id="statRate">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">ETA</div>
+          <div class="stat-value" id="statEta">—</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━━━━━━━━  RESULT  ━━━━━━━━━━ -->
+  <section class="card" id="resultSection" style="display:none">
+    <h2><span class="step-num" style="background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green)">✓</span> Match found!</h2>
+
+    <label style="margin-bottom:4px;color:var(--text)">bc1p — Ordinals address</label>
+    <div class="result-address" id="resAddress"></div>
+
+    <label style="margin-bottom:4px;color:var(--text)">bc1q — Payment address</label>
+    <div class="result-address" id="resAddressQ"></div>
+
+    <label style="margin-bottom:8px;color:var(--text)">Mnemonic</label>
+    <div class="mnemonic-grid" id="resMnemonic"></div>
+
+    <div class="warning-box">
+      <strong>⚠ Security:</strong>
+      Write down the mnemonic on paper <em>before</em> doing anything else.
+      Then <strong>shred</strong> <code>vanity_wallet_result.json</code> from your Desktop using a file-shredding tool (not a simple delete).
+      Import the mnemonic into your wallet as a <strong>new standalone seed</strong>, then reboot to clear RAM.
+      <br /><br />
+      If you cannot reboot immediately, click <strong>"Purge RAM"</strong> below as a minimum — this wipes the mnemonic from the server's RAM right now.
+      <br /><br />
+      <span style="color:var(--text-dim)">For a full explanation of what stays in memory and why, see the
+      <a href="http://localhost:5003/readme" target="_blank" rel="noopener"
+         style="color:var(--accent);text-decoration:underline">README — Security notes</a>.</span>
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-ghost" id="btnPurgeRAM">Purge RAM</button>
+    </div>
+  </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
