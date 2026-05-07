@@ -1,4 +1,4 @@
-# SeedCraft — Local mnemonic crafting (`/ordinals/vanity_wallet/`)
+# SeedCraft — Local mnemonic crafting (`/vanity_wallet/`)
 
 Generate a P2TR: `bc1p...` or P2WPKH: `bc1q...` vanity address for **Ordinals or Payment wallet**, one that starts and/or ends with a string of your choice, and outputs a full **BIP39 mnemonic** ready to import directly into compatible wallets (Xverse, Leather, Sparrow). Runs entirely offline on your local CPU, no compilation required.
 
