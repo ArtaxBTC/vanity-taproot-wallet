@@ -1,4 +1,4 @@
-# SeedCraft — Local mnemonic crafting 
+# SeedCraft — Local mnemonic crafting (`/ordinals/vanity_wallet/`)
 
 Generate a P2TR: `bc1p...` or P2WPKH: `bc1q...` vanity address for **Ordinals or Payment wallet**, one that starts and/or ends with a string of your choice, and outputs a full **BIP39 mnemonic** ready to import directly into compatible wallets (Xverse, Leather, Sparrow). Runs entirely offline on your local CPU, no compilation required.
 
@@ -7,6 +7,12 @@ Generate a P2TR: `bc1p...` or P2WPKH: `bc1q...` vanity address for **Ordinals or
 </p>
 
 ## Changelog
+
+**v0.62**
+- Fixed synthetic pattern matches (`all-letter`, `all-digit`) not triggering a UI notification: added a 5-second status poll as a fallback alongside the SSE stream, so the result is always detected even if the `found` event is dropped (broken connection, browser throttling, etc.)
+
+**v0.61**
+- Added a sound when a match is found
 
 **v0.6**
 - Added `bc1q` (P2WPKH / Native SegWit) vanity search support alongside `bc1p`

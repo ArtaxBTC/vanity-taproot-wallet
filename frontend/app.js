@@ -348,6 +348,7 @@ async function startMining() {
   _running = true;
   setRunningUI(true);
   openSSE();
+  _startResultPoll();
 }
 
 async function stopMining() {
@@ -390,6 +391,8 @@ function openSSE() {
   if (_sse) { _sse.close(); _sse = null; }
   _sse = new EventSource(`${API}/api/stream`);
 
+  const _foundAudio = new Audio(`${API}/pattern_found.mp3`);
+
   _sse.onmessage = e => {
     const d = JSON.parse(e.data);
 
@@ -414,6 +417,7 @@ function openSSE() {
       _sse.close(); _sse = null;
       _running = false;
       setRunningUI(false);
+      _foundAudio.play().catch(() => {});
       fetchAndShowResult();
     }
 
@@ -428,12 +432,48 @@ function openSSE() {
     }
   };
 
-  _sse.onerror = () => {
+  _sse.onerror = async () => {
     if (_running) {
+      // Before reconnecting, check whether the result is already available
+      // (handles the case where the result arrived while the SSE was broken).
+      try {
+        const s = await fetch(`${API}/api/status`).then(r => r.json());
+        if (s.has_result) {
+          _sse.close(); _sse = null;
+          _running = false;
+          setRunningUI(false);
+          _foundAudio.play().catch(() => {});
+          fetchAndShowResult();
+          return;
+        }
+      } catch { /* ignore — reconnect normally */ }
       // reconnect
       setTimeout(openSSE, 2000);
     }
   };
+}
+
+// ── Periodic poll fallback ────────────────────────────────────────────────
+// Even if the SSE never delivers the 'found' event (dropped connection,
+// server restart, etc.) this poll will detect the result within ~5 seconds.
+let _pollTimer = null;
+
+function _startResultPoll() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(async () => {
+    if (!_running) { clearInterval(_pollTimer); _pollTimer = null; return; }
+    try {
+      const s = await fetch(`${API}/api/status`).then(r => r.json());
+      if (s.has_result) {
+        clearInterval(_pollTimer); _pollTimer = null;
+        _running = false;
+        if (_sse) { _sse.close(); _sse = null; }
+        setRunningUI(false);
+        new Audio(`${API}/pattern_found.mp3`).play().catch(() => {});
+        fetchAndShowResult();
+      }
+    } catch { /* ignore */ }
+  }, 5000);
 }
 
 // ── Display result ────────────────────────────────────────────────────────
@@ -525,6 +565,7 @@ $('btnPurgeRAM').addEventListener('click', async () => {
       _running = true;
       setRunningUI(true);
       openSSE();
+      _startResultPoll();
     } else if (d.has_result) {
       fetchAndShowResult();
     }

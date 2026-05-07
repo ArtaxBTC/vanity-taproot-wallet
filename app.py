@@ -55,6 +55,18 @@ _session = {
 }
 _session_lock = threading.Lock()
 
+# On startup: if a result file was saved (e.g. from a previous run or after a
+# server restart), load it back into memory so the UI can retrieve it.
+try:
+    if _RESULT_FILE.exists():
+        with open(_RESULT_FILE) as _f:
+            _saved = json.load(_f)
+        # Only restore if it looks like a real result (has mnemonic + address)
+        if _saved.get("mnemonic") and _saved.get("bc1p"):
+            _session["result"] = _saved
+except Exception:
+    pass
+
 # ── Frontend serving ──────────────────────────────────────────────────────
 
 @app.route("/")

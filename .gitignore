@@ -2,6 +2,9 @@
 vanity_wallet_result.json
 vanity_wallet_checkpoint.json
 
+# Private (search patterns)
+vanity_patterns.json
+
 # Python
 __pycache__/
 *.py[cod]
