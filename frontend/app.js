@@ -365,6 +365,7 @@ function setRunningUI(running) {
   $('btnStart').disabled  = running;
   $('btnStop').disabled   = !running;
   $('progressSection').style.display = running ? 'block' : 'none';
+  window.Bech32Bg?.[running ? 'start' : 'stop']();
   if (running) {
     _startTime = Date.now();
     $('mineStatusLabel').textContent = '⛏ Mining…';

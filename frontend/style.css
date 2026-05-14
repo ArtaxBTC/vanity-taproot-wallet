@@ -5,9 +5,9 @@
 
 :root {
   --bg:        #0f0f0f;
-  --bg2:       #1a1a1a;
-  --bg3:       #252525;
-  --border:    #2e2e2e;
+  --bg2:       #0a0a0a;
+  --bg3:       rgba(247,147,26,0.06);
+  --border:    rgba(247,147,26,0.20);
   --text:      #e8e8e8;
   --text-dim:  #7a7a7a;
   --accent:    #f7931a;
@@ -20,10 +20,10 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+html { font-size: clamp(14px, 0.78125vw, 20px); background: #0f0f0f; }
 
 body {
-  background:     var(--bg);
+  background:     transparent;
   color:          var(--text);
   font-family:    var(--font-sans);
   min-height:     100vh;
@@ -47,9 +47,9 @@ header {
   justify-content: center;
   padding:         0 24px;
   height:          62px;
-  background:      rgba(15,15,15,.95);
-  border-bottom:   1px solid var(--border);
-  backdrop-filter: blur(6px);
+  background:      #080808;
+  border-bottom:   1px solid rgba(247,147,26,0.30);
+  box-shadow:      0 1px 24px rgba(247,147,26,0.07);
   text-align:      center;
 }
 
@@ -70,7 +70,7 @@ header {
 
 main {
   flex:           1;
-  max-width:      960px;
+  max-width:      clamp(960px, 50vw, 1600px);
   width:          100%;
   margin:         0 auto;
   padding:        28px 20px 80px;
@@ -82,10 +82,11 @@ main {
 /* ─────────────  CARD  ───────────── */
 
 .card {
-  background:    var(--bg2);
-  border:        1px solid var(--border);
+  background:    #080808;
+  border:        1px solid rgba(247,147,26,0.20);
   border-radius: var(--radius);
   padding:       22px 24px;
+  box-shadow:    0 0 0 1px rgba(247,147,26,0.05), 0 4px 32px rgba(0,0,0,0.7), inset 0 0 60px rgba(247,147,26,0.02);
 }
 
 .card h2 {
@@ -146,7 +147,22 @@ input[type=text]:focus,
 input[type=number]:focus,
 select:focus { border-color: var(--accent); }
 
-select { font-family: var(--font-sans); cursor: pointer; }
+select {
+  font-family:  var(--font-sans);
+  cursor:       pointer;
+  background:   #1a1a1a;
+  color-scheme: dark;
+  accent-color: #3a3a3a;
+}
+select option {
+  background-color: #1a1a1a;
+  color:            #e8e8e8;
+}
+select option:hover,
+select option:checked {
+  background-color: #2d2d2d;
+  color:            #e8e8e8;
+}
 
 .checkbox-row {
   display:     flex;
@@ -461,20 +477,21 @@ button {
 /* ─────────────  FOOTER BAR  ───────────── */
 
 .fee-bar {
-  position:     fixed;
-  bottom:       0;
-  left:         0;
-  right:        0;
-  height:       34px;
-  display:      flex;
-  align-items:  center;
-  gap:          10px;
-  padding:      0 20px;
-  background:   rgba(15,15,15,.97);
-  border-top:   1px solid var(--border);
-  font-size:    .78rem;
-  color:        var(--text-dim);
-  z-index:      50;
+  position:        fixed;
+  bottom:          0;
+  left:            0;
+  right:           0;
+  height:          34px;
+  display:         flex;
+  align-items:     center;
+  gap:             10px;
+  padding:         0 20px;
+  background:      #080808;
+  border-top:      1px solid rgba(247,147,26,0.30);
+  font-size:       .78rem;
+  color:           var(--text-dim);
+  z-index:         50;
+  box-shadow:      0 -1px 24px rgba(247,147,26,0.07);
 }
 
 /* ─────────────  CUSTOM TOOLTIP (data-tip)  ───────────── */
