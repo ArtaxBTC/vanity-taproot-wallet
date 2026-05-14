@@ -8,6 +8,9 @@ Generate a P2TR: `bc1p...` or P2WPKH: `bc1q...` vanity address for **Ordinals or
 
 ## Changelog
 
+**v0.64**
+- Small edit of bech32 background, orange frozen chars who appear randomly are now red or green.
+
 **v0.63**
 - Added a bech32 background, animated when you're mining, not when you aren't. Some template changes and favicon added.
 

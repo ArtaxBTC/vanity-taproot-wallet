@@ -17,15 +17,19 @@ const CELL_H         = 21;     // row height    (px)
 
 // Regular cycling characters
 const OPACITY_DIM    = 0.38;
-// Locked (matched) character — punchy orange flash
+// Locked (matched) character — random red or green flash
 const OPACITY_LOCK   = 0.82;
 
-// #f7931a = bitcoin orange (matches seedcraft accent)
+// #f7931a = bitcoin orange (regular chars)
 const CR = 247, CG = 147, CB = 26;
 
-const DIM_CLR        = `rgba(${CR},${CG},${CB},${OPACITY_DIM})`;
-const LOCK_CLR       = `rgba(${CR},${CG},${CB},${OPACITY_LOCK})`;
-const LOCK_BG        = `rgba(${CR},${CG},${CB},0.10)`;  // subtle box behind locked char
+const DIM_CLR  = `rgba(${CR},${CG},${CB},${OPACITY_DIM})`;
+
+// Lock-in color pairs: [char color, bg color]
+const LOCK_COLORS = [
+  [`rgba(239,68,68,${OPACITY_LOCK})`,  'rgba(239,68,68,0.12)'],   // red
+  [`rgba(34,197,94,${OPACITY_LOCK})`,  'rgba(34,197,94,0.12)'],   // green
+];
 
 const LOCK_INTERVAL  = 380;   // ms between new lock-in spawns
 const LOCK_HOLD      = 720;   // ms each cell stays locked
@@ -107,7 +111,10 @@ if (ENABLED) (function () {
     for (let attempt = 0; attempt < 30; attempt++) {
       const idx = Math.floor(Math.random() * cells.length);
       if (cells[idx] && !cells[idx].locked) {
-        cells[idx].locked = true;
+        const [clr, bg] = LOCK_COLORS[Math.random() < 0.5 ? 0 : 1];
+        cells[idx].locked  = true;
+        cells[idx].lockClr = clr;
+        cells[idx].lockBg  = bg;
         locks.push({ idx, until: ts + LOCK_HOLD });
         break;
       }
@@ -166,10 +173,10 @@ if (ENABLED) (function () {
         const ch = CHARSET[cell.offset];
 
         if (cell.locked) {
-          // Highlight rectangle + bright character
-          ctx.fillStyle = LOCK_BG;
+          // Highlight rectangle + bright character (color assigned at spawn)
+          ctx.fillStyle = cell.lockBg;
           ctx.fillRect(x, r * CELL_H, CELL_W, CELL_H);
-          ctx.fillStyle = LOCK_CLR;
+          ctx.fillStyle = cell.lockClr;
         } else {
           ctx.fillStyle = DIM_CLR;
         }
